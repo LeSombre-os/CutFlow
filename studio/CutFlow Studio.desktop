@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=🎬 CutFlow Studio
+Comment=Lance l'app locale (terminal + navigateur). Copier ce fichier dans ~/.local/share/applications/ si besoin.
+Exec=/media/lesombre/2A14-B525/SSD_E/Opencode/CutFlow/studio/lancer.sh
+Icon=applications-multimedia
+Terminal=true
+Categories=AudioVideo;Video;
+StartupNotify=false

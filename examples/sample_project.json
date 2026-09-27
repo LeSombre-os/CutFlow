@@ -1,0 +1,130 @@
+{
+  "version": "1.0",
+  "project": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "output_format": "mp4",
+    "background_color": "black",
+    "audio_sample_rate": 48000,
+    "audio_channels": 2
+  },
+  "tracks": [
+    {
+      "id": "main_video",
+      "type": "video",
+      "layer": 0,
+      "clips": [
+        {
+          "source": "input1.mp4",
+          "source_in": 0,
+          "source_out": 5,
+          "timeline_in": 0,
+          "volume": 1.0,
+          "effects": [
+            {
+              "type": "fade",
+              "direction": "in",
+              "duration": 0.5
+            }
+          ]
+        },
+        {
+          "source": "input2.mp4",
+          "source_in": 2,
+          "source_out": 7,
+          "timeline_in": 5,
+          "transform": {
+            "scale": 1.1,
+            "position_x": 0,
+            "position_y": 0
+          },
+          "effects": [
+            {
+              "type": "zoom",
+              "intensity": 1.2,
+              "params": {
+                "from": 1.0,
+                "to": 1.2
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "overlay_logo",
+      "type": "overlay",
+      "layer": 10,
+      "clips": [
+        {
+          "source": "logo.png",
+          "timeline_in": 0,
+          "duration": 10,
+          "transform": {
+            "scale": 0.3,
+            "position_x": 1600,
+            "position_y": 30,
+            "opacity": 0.85
+          }
+        }
+      ]
+    },
+    {
+      "id": "music",
+      "type": "audio",
+      "layer": 0,
+      "volume": 0.6,
+      "clips": [
+        {
+          "source": "music.mp3",
+          "source_in": 0,
+          "source_out": 10,
+          "timeline_in": 0,
+          "volume": 0.7
+        }
+      ]
+    },
+    {
+      "id": "voiceover",
+      "type": "audio",
+      "layer": 1,
+      "clips": [
+        {
+          "source": "voiceover.wav",
+          "timeline_in": 0.5,
+          "volume": 1.0
+        }
+      ]
+    },
+    {
+      "id": "captions",
+      "type": "captions",
+      "layer": 20,
+      "clips": [
+        {
+          "source": "Bonjour et bienvenue dans CutFlow !",
+          "timeline_in": 0.5,
+          "duration": 3
+        },
+        {
+          "source": "Le montage vidéo programmatif et agentique.",
+          "timeline_in": 4,
+          "duration": 3
+        }
+      ]
+    }
+  ],
+  "audio_mix": {
+    "master_volume": 1.0,
+    "normalize": false,
+    "ducking": [
+      {
+        "trigger_track": "voiceover",
+        "target_track": "music",
+        "attenuation_db": -12,
+        "fade_duration": 0.3
+      }
+    ]
+  }
+}

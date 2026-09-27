@@ -1,0 +1,20 @@
+{
+  "project": {
+    "resolution": "1280x720",
+    "fps": 25
+  },
+  "tracks": [
+    {
+      "id": "v1",
+      "type": "video",
+      "layer": 0,
+      "clips": [
+        {
+          "source": "color:black",
+          "timeline_in": 0,
+          "duration": 3
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CutFlow Studio</title>
+<style>
+:root { color-scheme: dark; --bg: #14161a; --panel: #1d2026; --line: #2c313a; --txt: #e8eaed; --dim: #9aa0aa; --acc: #4da3ff; --ok: #3fce7a; --err: #ff5d5d; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--txt); font: 14px/1.5 system-ui, sans-serif; }
+header { padding: 12px 20px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center; }
+header h1 { font-size: 18px; margin: 0; }
+#diag { margin-left: auto; font-size: 12px; color: var(--dim); }
+main { display: grid; grid-template-columns: 300px 1fr; gap: 12px; padding: 12px; max-width: 1400px; margin: 0 auto; }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+h2 { font-size: 14px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .05em; color: var(--dim); }
+input, select, button { font: inherit; color: var(--txt); background: #101216; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+input[type=text], input[type=number], select { width: 100%; margin: 2px 0 8px; }
+button { cursor: pointer; background: #24344d; border-color: #33507c; }
+button:hover { background: #2e4266; }
+button.primary { background: #1d4fa3; border-color: #2f6bd6; font-weight: bold; }
+button.danger { background: #4d2424; border-color: #7c3333; }
+button:disabled { opacity: .5; cursor: default; }
+.proj { display: flex; gap: 8px; align-items: center; padding: 6px; border-radius: 6px; cursor: pointer; }
+.proj:hover, .proj.sel { background: #262b34; }
+.proj small { color: var(--dim); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+#progress { height: 8px; background: #101216; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+#progress > div { height: 100%; width: 0; background: var(--acc); transition: width .3s; }
+#log { background: #101216; border: 1px solid var(--line); border-radius: 6px; padding: 8px; height: 160px; overflow-y: auto; font: 12px monospace; white-space: pre-wrap; }
+video { width: 100%; max-height: 60vh; background: #000; border-radius: 6px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+td, th { border-bottom: 1px solid var(--line); padding: 4px 6px; text-align: left; }
+th { color: var(--dim); font-weight: normal; }
+label { font-size: 12px; color: var(--dim); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎬 CutFlow Studio <small id="ver" style="color:var(--dim)"></small></h1>
+  <div id="diag">…</div>
+</header>
+<main>
+  <div>
+    <section>
+      <h2>Projets</h2>
+      <div id="projects"></div>
+      <hr style="border-color:var(--line)">
+      <label>Nom</label>
+      <input type="text" id="pname" placeholder="Showcase LifeMod">
+      <label>Dossier de rushs (chemin serveur)</label>
+      <input type="text" id="prush" placeholder="/media/…/Rush/ShowCase-LifeMod">
+      <button class="primary" id="create">Créer</button>
+    </section>
+    <section>
+      <h2>Importer (upload)</h2>
+      <input type="file" id="files" multiple accept="video/*,audio/*">
+      <button id="upload">Envoyer vers le projet</button>
+    </section>
+  </div>
+  <div>
+    <section>
+      <h2 id="ptitle">Sélectionne un projet</h2>
+      <div class="row">
+        <button class="primary" id="analyze">🔍 Analyser</button>
+        <button class="primary" id="auto">✂️ Montage auto</button>
+        <button id="cancel" disabled>⏹ Arrêter</button>
+        <button id="refresh">↻ Actualiser</button>
+        <button class="danger" id="del">Supprimer</button>
+      </div>
+      <div class="grid2" style="margin-top:8px">
+        <div><label>Silence min (s)</label><input type="number" id="silence" value="0.8" step="0.1" min="0.2"></div>
+        <div><label>Sous-titres</label>
+          <select id="submode"><option value="key">Phrases-clés</option><option value="full">Intégraux</option><option value="off">Désactivés</option></select>
+        </div>
+      </div>
+      <div id="progress"><div></div></div>
+      <div id="log"></div>
+    </section>
+    <section>
+      <h2>Rushs analysés</h2>
+      <div id="analysis"><small style="color:var(--dim)">Lance “Analyser”.</small></div>
+    </section>
+    <section>
+      <h2>Aperçu</h2>
+      <video id="preview" controls preload="none"></video>
+      <div class="row" id="dlrow" style="margin-top:8px; display:none">
+        <a id="dl" href="#" download><button>Télécharger MP4</button></a>
+      </div>
+    </section>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let PID = null, ES = null, JOB = null;
+
+const log = m => { const l = $('log'); l.textContent += m + '\n'; l.scrollTop = l.scrollHeight; };
+const api = (m, url, body) => fetch(url, { method: m, headers: {'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined }).then(r => r.json().then(j => ({ok: r.ok, ...j})));
+
+async function health() {
+  const h = await api('GET', '/api/health');
+  $('ver').textContent = 'v' + (h.app || '?');
+  $('diag').textContent = `ffmpeg ${h.ffmpeg ? '✅' : '❌'} · whisper ${h.whisper ? '✅ (local)' : '❌ (mode silences)'} · ${h.projects} projet(s)`;
+}
+async function listProjects() {
+  const r = await api('GET', '/api/projects');
+  const box = $('projects'); box.innerHTML = '';
+  (r.projects || []).forEach(p => {
+    const d = document.createElement('div');
+    d.className = 'proj' + (p.id === PID ? ' sel' : '');
+    d.innerHTML = `<div>📁 ${p.name} <small>${p.rushes} rush(s)</small></div>`;
+    d.onclick = () => select(p.id, p.name);
+    box.appendChild(d);
+  });
+}
+async function select(id, name) {
+  PID = id; $('ptitle').textContent = '📁 ' + name;
+  $('preview').removeAttribute('src'); $('preview').load();
+  $('dlrow').style.display = 'none';
+  await listProjects(); await showAnalysis();
+}
+async function showAnalysis() {
+  if (!PID) return;
+  const det = await api('GET', `/api/projects/${PID}`);
+  const files = det.files || [];
+  const r = await api('GET', `/api/projects/${PID}/analysis`);
+  const ana = {};
+  (r.files || []).forEach(f => { ana[f.name] = f; });
+  let html = '<table><tr><th>Rush</th><th>Durée</th><th>Transcription</th></tr>';
+  if (!files.length) html += '<tr><td colspan="3"><small style="color:var(--dim)">Aucun rush — ajoute un dossier ou uploade des fichiers.</small></td></tr>';
+  files.forEach(n => {
+    const f = ana[n];
+    const d = f?.media?.duration ? f.media.duration.toFixed(0) + 's' : '—';
+    const t = !f ? '<small style="color:var(--dim)">non analysé</small>'
+      : f.transcript ? `${f.transcript.segments?.length || 0} seg · ${f.transcript.silences?.length || 0} sil`
+      : `<small style="color:var(--err)">${f.transcript_error || f.media_error || '?'}</small>`;
+    html += `<tr><td>${n}</td><td>${d}</td><td>${t}</td></tr>`;
+  });
+  $('analysis').innerHTML = html + '</table>';
+  const pv = await fetch(`/api/projects/${PID}/preview`, {method: 'HEAD'});
+  if (pv.ok) {
+    $('preview').src = `/api/projects/${PID}/preview`;
+    $('dl').href = `/api/projects/${PID}/preview`;
+    $('dlrow').style.display = 'flex';
+  } else {
+    $('dlrow').style.display = 'none';
+  }
+}
+function setBusy(b) {
+  ['analyze', 'auto'].forEach(id => $(id).disabled = b);
+  $('cancel').disabled = !b;
+}
+function watch(job, done) {
+  if (ES) ES.close();
+  setBusy(true); JOB = job;
+  document.querySelector('#progress > div').style.width = '0';
+  ES = new EventSource(`/api/jobs/${job}/events`);
+  ES.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.done !== undefined && m.total) {
+      document.querySelector('#progress > div').style.width = (100 * m.done / m.total) + '%';
+      if (m.info) log(`… ${m.info} (${m.done}/${m.total})`);
+    }
+    if (m.state === 'done' || m.state === 'failed' || m.state === 'cancelled') {
+      ES.close(); setBusy(false);
+      log((m.state === 'done' ? '✅ ' : '❌ ') + JSON.stringify(m.result || {}));
+      document.querySelector('#progress > div').style.width = m.state === 'done' ? '100%' : '0';
+      done && done(m);
+    }
+  };
+  ES.onerror = () => log('⚠️ connexion SSE perdue — rouvre la page pour te rattacher (job conservé)');
+}
+$('create').onclick = async () => {
+  const r = await api('POST', '/api/projects', {name: $('pname').value || 'Sans titre', rush_dir: $('prush').value});
+  if (r.id) { $('pname').value = ''; $('prush').value = ''; await listProjects(); select(r.id, r.name); log('✅ projet ' + r.id); } else log('❌ ' + r.error);
+};
+$('pname').addEventListener('keydown', e => { if (e.key === 'Enter') $('create').click(); });
+$('upload').onclick = async () => {
+  if (!PID) return log('❌ sélectionne un projet');
+  if (!$('files').files.length) return log('❌ choisis des fichiers');
+  const fd = new FormData();
+  for (const f of $('files').files) fd.append('f', f, f.name);
+  const r = await fetch(`/api/projects/${PID}/upload`, {method: 'POST', body: fd}).then(r => r.json());
+  if (r.saved?.length) log('✅ ' + r.saved.join(', '));
+  if (r.rejected?.length) log('⚠️ ignorés (non audio/vidéo) : ' + r.rejected.join(', '));
+  if (r.error) log('❌ ' + r.error);
+  listProjects(); showAnalysis();
+};
+$('analyze').onclick = async () => {
+  if (!PID) return log('❌ sélectionne un projet');
+  const r = await api('POST', `/api/projects/${PID}/analyze`);
+  r.job ? watch(r.job, showAnalysis) : log('❌ ' + r.error);
+};
+$('auto').onclick = async () => {
+  if (!PID) return log('❌ sélectionne un projet');
+  const r = await api('POST', `/api/projects/${PID}/auto`, {
+    silence: parseFloat($('silence').value) || 0.8,
+    captions_mode: $('submode').value,
+    captions: $('submode').value !== 'off',
+  });
+  r.job ? watch(r.job, showAnalysis) : log('❌ ' + r.error);
+};
+$('cancel').onclick = async () => { if (JOB) { await api('POST', `/api/jobs/${JOB}/cancel`); log('⏹ arrêt demandé'); } };
+$('refresh').onclick = async () => { await health(); await listProjects(); await showAnalysis(); };
+$('del').onclick = async () => {
+  if (!PID || !confirm('Supprimer ce projet ?')) return;
+  await api('DELETE', `/api/projects/${PID}`); PID = null;
+  $('ptitle').textContent = 'Sélectionne un projet'; await listProjects();
+};
+health(); listProjects();
+</script>
+</body>
+</html>
